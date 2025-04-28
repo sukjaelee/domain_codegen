@@ -1,0 +1,26 @@
+use crate::{
+{%- for module in modules %}
+    {{ module }}::routes::{{ module }}_routes,
+{%- endfor %}
+};
+
+use crate::{
+{%- for module in modules %}
+    {{ module }}::routes::{{ module | capitalize }}ApiDoc,
+{%- endfor %}
+};
+
+fn create_swagger_ui() -> SwaggerUi {
+    SwaggerUi::new("/docs")
+    {%- for module in modules %}
+        .url("/api-docs/{{ module }}/openapi.json", {{ module | capitalize }}ApiDoc::openapi())
+    {%- endfor %}
+}
+
+pub fn create_router(state: AppState) -> Router {
+    let protected_routes = Router::new()
+    {%- for module in modules %}
+        .nest("/{{ module }}", {{ module }}_routes())
+    {%- endfor %};
+
+}

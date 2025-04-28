@@ -1,0 +1,41 @@
+
+
+use std::sync::Arc;
+
+use crate::{
+{%- for module in modules %}
+    {{ module }}::domain::service::{{ module | capitalize }}ServiceTrait,
+{%- endfor %}
+};
+
+use super::config::Config;
+
+/// AppState is a struct that holds the application-wide shared state.
+/// It is passed to request handlers via Axum's extension mechanism.
+#[derive(Clone)]
+pub struct AppState {
+    /// Global application configuration.
+    pub config: Config,
+
+{%- for module in modules %}
+    /// Service handling {{ module }}-related logic.
+    pub {{ module }}_service: Arc<dyn {{ module | capitalize }}ServiceTrait>,
+{%- endfor %}
+}
+
+impl AppState {
+    /// Creates a new instance of AppState with the provided dependencies.
+    pub fn new(
+        config: Config,
+{%- for module in modules %}
+        {{ module }}_service: Arc<dyn {{ module | capitalize }}ServiceTrait>,
+{%- endfor %}
+    ) -> Self {
+        Self {
+            config,
+{%- for module in modules %}
+            {{ module }}_service,
+{%- endfor %}
+        }
+    }
+}

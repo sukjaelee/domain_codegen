@@ -1,0 +1,108 @@
+use crate::common::error::AppError;
+
+use super::{
+    domain::{repository::{{ struct_name }}Repository, service::{{ struct_name }}ServiceTrait},
+    dto::{Create{{ struct_name }}Dto, {{ struct_name }}Dto, Update{{ struct_name }}Dto},
+    queries::{{ struct_name }}Repo,
+};
+
+use async_trait::async_trait;
+use sqlx::MySqlPool;
+use std::sync::Arc;
+
+/// Service struct for handling {{ module_name }}-related operations.
+#[derive(Clone)]
+pub struct {{ struct_name }}Service {
+    pool: MySqlPool,
+    repo: Arc<dyn {{ struct_name }}Repository + Send + Sync>,
+}
+
+impl {{ struct_name }}Service {
+    pub fn create_service(pool: MySqlPool) -> Arc<dyn {{ struct_name }}ServiceTrait> {
+        Arc::new(Self {
+            pool,
+            repo: Arc::new({{ struct_name }}Repo {}),
+        })
+    }
+}
+
+#[async_trait]
+impl {{ struct_name }}ServiceTrait for {{ struct_name }}Service {
+    async fn get_{{ module_name }}s(&self) -> Result<Vec<{{ struct_name }}Dto>, AppError> {
+        match self.repo.find_all(self.pool.clone()).await {
+            Ok(items) => Ok(items.into_iter().map(Into::into).collect()),
+            Err(err) => {
+                tracing::error!("Error fetching {{ module_name }}s: {err}");
+                Err(AppError::DatabaseError(err))
+            }
+        }
+    }
+
+    async fn get_{{ module_name }}_by_id(&self, id: String) -> Result<{{ struct_name }}Dto, AppError> {
+        match self.repo.find_by_id(self.pool.clone(), id).await {
+            Ok(Some(item)) => Ok(item.into()),
+            Ok(None) => Err(AppError::NotFound("{{ struct_name }} not found".into())),
+            Err(err) => {
+                tracing::error!("Error fetching {{ module_name }}: {err}");
+                Err(AppError::DatabaseError(err))
+            }
+        }
+    }
+
+    async fn create_{{ module_name }}(&self, payload: Create{{ struct_name }}Dto) -> Result<{{ struct_name }}Dto, AppError> {
+        let mut tx = self.pool.begin().await?;
+        match self.repo.create(&mut tx, payload).await {
+            Ok(item) => {
+                tx.commit().await?;
+                Ok(item.into())
+            }
+            Err(err) => {
+                tracing::error!("Error creating {{ module_name }}: {err}");
+                tx.rollback().await?;
+                Err(AppError::DatabaseError(err))
+            }
+        }
+    }
+
+    async fn update_{{ module_name }}(
+        &self,
+        id: String,
+        payload: Update{{ struct_name }}Dto,
+    ) -> Result<{{ struct_name }}Dto, AppError> {
+        let mut tx = self.pool.begin().await?;
+        match self.repo.update(&mut tx, id, payload).await {
+            Ok(Some(item)) => {
+                tx.commit().await?;
+                Ok(item.into())
+            }
+            Ok(None) => {
+                tx.rollback().await?;
+                Err(AppError::NotFound("{{ struct_name }} not found".into()))
+            }
+            Err(err) => {
+                tracing::error!("Error updating {{ module_name }}: {err}");
+                tx.rollback().await?;
+                Err(AppError::DatabaseError(err))
+            }
+        }
+    }
+
+    async fn delete_{{ module_name }}(&self, id: String) -> Result<String, AppError> {
+        let mut tx = self.pool.begin().await?;
+        match self.repo.delete(&mut tx, id).await {
+            Ok(true) => {
+                tx.commit().await?;
+                Ok(format!("{{ struct_name }} deleted"))
+            }
+            Ok(false) => {
+                tx.rollback().await?;
+                Err(AppError::NotFound("{{ struct_name }} not found".into()))
+            }
+            Err(err) => {
+                tracing::error!("Error deleting {{ module_name }}: {err}");
+                tx.rollback().await?;
+                Err(AppError::DatabaseError(err))
+            }
+        }
+    }
+}

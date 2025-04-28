@@ -1,0 +1,20 @@
+{
+    "todos": {
+        "module_name": "todo",
+        "struct_name": "Todo",
+        "create_special_fields": [
+            "id",
+            "created_at",
+            "modified_at"
+        ],
+        "update_special_fields": [
+            "id",
+            "created_at",
+            "created_by",
+            "modified_at"
+        ],
+        "always_include_in_dto": [
+            "modified_by"
+        ]
+    }
+}

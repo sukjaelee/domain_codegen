@@ -1,0 +1,57 @@
+use serde::Deserialize;
+
+use super::domain::model::{{ struct_name }};
+
+use utoipa::ToSchema;
+
+#[derive(PartialEq, Debug, Deserialize, serde::Serialize, ToSchema)]
+pub struct {{ struct_name }}Dto {
+{%- for field in fields %}
+    {%- if field.is_datetime == "true" %}
+        {%- if field.is_optional == "true" %}
+    #[serde(with = "crate::common::ts_format::option")]
+        {%- else %}
+    #[serde(with = "crate::common::ts_format")]
+        {%- endif %}
+    {%- endif %}
+    pub {{ field.name }}: {{ field.ty }},
+{%- endfor %}
+}
+
+impl From<{{ struct_name }}> for {{ struct_name }}Dto {
+    fn from(entity: {{ struct_name }}) -> Self {
+        Self {
+{%- for field in fields %}
+            {{ field.name }}: entity.{{ field.name }},
+{%- endfor %}
+        }
+    }
+}
+
+#[derive(PartialEq, Debug, Deserialize, serde::Serialize, ToSchema)]
+pub struct Create{{ struct_name }}Dto {
+{%- for field in create_fields %}
+    {%- if field.is_datetime == "true" %}
+        {%- if field.is_optional == "true" %}
+    #[serde(with = "crate::common::ts_format::option")]
+        {%- else %}
+    #[serde(with = "crate::common::ts_format")]
+        {%- endif %}
+    {%- endif %}
+    pub {{ field.name }}: {{ field.ty }},
+{%- endfor %}
+}
+
+#[derive(PartialEq, Debug, Deserialize, serde::Serialize, ToSchema)]
+pub struct Update{{ struct_name }}Dto {
+{%- for field in update_fields %}
+    {%- if field.is_datetime == "true" %}
+        {%- if field.is_optional == "true" %}
+    #[serde(with = "crate::common::ts_format::option")]
+        {%- else %}
+    #[serde(with = "crate::common::ts_format")]
+        {%- endif %}
+    {%- endif %}
+    pub {{ field.name }}: {{ field.ty }},
+{%- endfor %}
+}

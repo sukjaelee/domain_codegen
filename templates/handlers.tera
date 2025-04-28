@@ -1,0 +1,94 @@
+use crate::common::dto::RestApiResponse;
+use crate::common::{app_state::AppState, error::AppError, jwt::Claims};
+
+use crate::{{ module_name }}::dto::{Create{{ struct_name }}Dto, {{ struct_name }}Dto, Update{{ struct_name }}Dto};
+use axum::{
+    extract::{Path, State},
+    response::IntoResponse,
+    Extension, Json,
+};
+
+#[utoipa::path(
+    get,
+    path = "/{{ module_name }}",
+    responses((status = 200, description = "List all {{ module_name }}s", body = [{{ struct_name }}Dto])),
+    tag = "{{ struct_name }}s"
+)]
+pub async fn get_{{ module_name }}s(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let items = state.{{ module_name }}_service.get_{{ module_name }}s().await?;
+    Ok(RestApiResponse::success(items))
+}
+
+#[utoipa::path(
+    get,
+    path = "/{{ module_name }}/{id}",
+    responses((status = 200, description = "Get {{ module_name }} by ID", body = {{ struct_name }}Dto)),
+    tag = "{{ struct_name }}s"
+)]
+pub async fn get_{{ module_name }}_by_id(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, AppError> {
+    let item = state.{{ module_name }}_service.get_{{ module_name }}_by_id(id).await?;
+    Ok(RestApiResponse::success(item))
+}
+
+#[utoipa::path(
+    post,
+    path = "/{{ module_name }}",
+    request_body = Create{{ struct_name }}Dto,
+    responses((status = 200, description = "Create a new {{ module_name }}", body = {{ struct_name }}Dto)),
+    tag = "{{ struct_name }}s"
+)]
+pub async fn create_{{ module_name }}(
+    State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
+    Json(payload): Json<Create{{ struct_name }}Dto>,
+) -> Result<impl IntoResponse, AppError> {
+    let mut payload = payload;
+
+    //-- replace start
+    payload.created_by = claims.sub.clone();
+    payload.modified_by = claims.sub.clone();
+    //--replace end 
+
+    let item = state.{{ module_name }}_service.create_{{ module_name }}(payload).await?;
+    Ok(RestApiResponse::success(item))
+}
+
+#[utoipa::path(
+    put,
+    path = "/{{ module_name }}/{id}",
+    request_body = Update{{ struct_name }}Dto,
+    responses((status = 200, description = "Update {{ module_name }}", body = {{ struct_name }}Dto)),
+    tag = "{{ struct_name }}s"
+)]
+pub async fn update_{{ module_name }}(
+    State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
+    Path(id): Path<String>,
+    Json(payload): Json<Update{{ struct_name }}Dto>,
+) -> Result<impl IntoResponse, AppError> {
+    let mut payload = payload;
+
+    //-- replace start
+    payload.modified_by = claims.sub.clone();
+    //--replace end 
+    
+    let item = state.{{ module_name }}_service.update_{{ module_name }}(id, payload).await?;
+    Ok(RestApiResponse::success(item))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/{{ module_name }}/{id}",
+    responses((status = 200, description = "{{ struct_name }} deleted")),
+    tag = "{{ struct_name }}s"
+)]
+pub async fn delete_{{ module_name }}(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, AppError> {
+    let message = state.{{ module_name }}_service.delete_{{ module_name }}(id).await?;
+    Ok(RestApiResponse::success_with_message(message, ()))
+}

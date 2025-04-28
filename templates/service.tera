@@ -1,0 +1,31 @@
+//! This module defines the `{{ struct_name }}ServiceTrait` which encapsulates the business logic
+//! for managing {{ module_name }} in the system.
+
+use crate::{
+    common::error::AppError,
+    {{ module_name }}::dto::{ Create{{ struct_name }}Dto, {{ struct_name }}Dto, Update{{ struct_name }}Dto },
+};
+
+#[async_trait::async_trait]
+/// Trait defining the contract for {{ module_name }}-related business operations.
+/// This includes creating, retrieving, updating, and deleting {{ module_name }} records.
+pub trait {{ struct_name }}ServiceTrait: Send + Sync {
+    /// Retrieves a list of all {{ module_name }}.
+    async fn get_{{ module_name }}s(&self) -> Result<Vec<{{ struct_name }}Dto>, AppError>;
+
+    /// Retrieves a {{ module_name }} by its unique ID.
+    async fn get_{{ module_name }}_by_id(&self, id: String) -> Result<{{ struct_name }}Dto, AppError>;
+
+    /// Creates a new {{ module_name }} from the provided payload.
+    async fn create_{{ module_name }}(&self, payload: Create{{ struct_name }}Dto) -> Result<{{ struct_name }}Dto, AppError>;
+
+    /// Updates an existing {{ module_name }} with new data.
+    async fn update_{{ module_name }}(
+        &self,
+        id: String,
+        payload: Update{{ struct_name }}Dto,
+    ) -> Result<{{ struct_name }}Dto, AppError>;
+
+    /// Deletes a {{ module_name }} by its ID.
+    async fn delete_{{ module_name }}(&self, id: String) -> Result<String, AppError>;
+}
