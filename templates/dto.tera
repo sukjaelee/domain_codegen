@@ -2,6 +2,7 @@
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use utoipa::ToSchema;
+use crate::common::ts_format::convert_naive_to_offset;
 
 use super::domain::model::{{ struct_name }};
 
@@ -23,20 +24,8 @@ impl From<{{ struct_name }}> for {{ struct_name }}Dto {
     fn from(entity: {{ struct_name }}) -> Self {
         Self {
 {%- for field in fields %}
-    {%- if field.name == "due_date" %}
-            due_date: entity.due_date.map(|naive| {
-                OffsetDateTime::from_unix_timestamp(naive.and_utc().timestamp()).unwrap()
-            }),
-    {%- elif field.name == "created_at" %}
-            created_at: OffsetDateTime::from_unix_timestamp(
-                entity.created_at.and_utc().timestamp()
-            )
-            .unwrap(),
-    {%- elif field.name == "modified_at" %}
-            modified_at: OffsetDateTime::from_unix_timestamp(
-                entity.modified_at.and_utc().timestamp()
-            )
-            .unwrap(),
+    {%- if field.is_datetime == "true" %}
+             {{ field.name }}: entity.{{ field.name }}.map(|naive| convert_naive_to_offset(naive)),
     {%- else %}
             {{ field.name }}: entity.{{ field.name }},
     {%- endif %}
@@ -48,8 +37,12 @@ impl From<{{ struct_name }}> for {{ struct_name }}Dto {
 #[derive(PartialEq, Debug, Deserialize, Serialize, ToSchema)]
 pub struct Create{{ struct_name }}Dto {
 {%- for field in create_fields %}
-    {%- if field.name == "due_date" %}
+{%- if field.is_datetime == "true" %}
+        {%- if field.is_optional == "true" %}
     #[serde(with = "crate::common::ts_format::option")]
+        {%- else %}
+    #[serde(with = "crate::common::ts_format")]
+        {%- endif %}
     {%- endif %}
     pub {{ field.name }}: {{ field.ty }},
 {%- endfor %}
@@ -58,8 +51,12 @@ pub struct Create{{ struct_name }}Dto {
 #[derive(PartialEq, Debug, Deserialize, Serialize, ToSchema)]
 pub struct Update{{ struct_name }}Dto {
 {%- for field in update_fields %}
-    {%- if field.name == "due_date" %}
+{%- if field.is_datetime == "true" %}
+        {%- if field.is_optional == "true" %}
     #[serde(with = "crate::common::ts_format::option")]
+        {%- else %}
+    #[serde(with = "crate::common::ts_format")]
+        {%- endif %}
     {%- endif %}
     pub {{ field.name }}: {{ field.ty }},
 {%- endfor %}

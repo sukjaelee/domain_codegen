@@ -142,6 +142,7 @@ pub fn generate_lib(
 }
 
 /// Converts a snake_case string to PascalCase.
+#[allow(non_snake_case)]
 pub fn to_pascal_case(s: &str) -> String {
     s.split('_')
         .filter(|part| !part.is_empty())
