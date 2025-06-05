@@ -1,158 +1,134 @@
-use async_trait::async_trait;
-use sqlx::{mysql::MySql, Pool, Transaction};
+use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::common::ts_format::MYSQL_TIMESTAMP_FORMAT;
+use crate::common::ts_format::{convert_offset_to_naive, convert_offset_to_primitive};
 use crate::{{ module_name }}::domain::model::{{ struct_name }};
 use crate::{{ module_name }}::domain::repository::{{ struct_name }}Repository;
 use crate::{{ module_name }}::dto::{Create{{ struct_name }}Dto, Update{{ struct_name }}Dto};
 
+use async_trait::async_trait;
+
 pub struct {{ struct_name }}Repo;
+
+const FIND_{{ struct_name | upper }}_QUERY: &str = r#"
+    SELECT
+{%- for field in select_fields %}
+        {{ field }}{% if not loop.last %},{% endif %}
+{%- endfor %}
+    FROM {{ table_name }}
+    WHERE 1=1
+    "#;
+
+const FIND_{{ struct_name | upper }}_INFO_QUERY: &str = r#"
+    SELECT
+{%- for field in select_fields %}
+        {{ field }}{% if not loop.last %},{% endif %}
+{%- endfor %}
+    FROM {{ table_name }}
+    WHERE id = $1
+    "#;
 
 #[async_trait]
 impl {{ struct_name }}Repository for {{ struct_name }}Repo {
-    async fn find_all(&self, pool: Pool<MySql>) -> Result<Vec<{{ struct_name }}>, sqlx::Error> {
-        let items = sqlx::query_as!(
-            {{ struct_name }},
-            r#"
-            SELECT
-            {%- for field in select_fields %}
-                {{ field }}{% if not loop.last %},{% endif %}
-            {%- endfor %}
-            FROM {{ table_name }}
-            "#
-        )
-        .fetch_all(&pool)
-        .await?;
-
+    async fn find_all(&self, pool: PgPool) -> Result<Vec<{{ struct_name }}>, sqlx::Error> {
+        let items = sqlx::query_as::<_, {{ struct_name }}>(FIND_{{ struct_name | upper }}_QUERY)
+            .fetch_all(&pool)
+            .await?;
         Ok(items)
     }
 
-    async fn find_by_id(&self, pool: Pool<MySql>, id: String) -> Result<Option<{{ struct_name }}>, sqlx::Error> {
-        let item = sqlx::query_as!(
-            {{ struct_name }},
-            r#"
-            SELECT
-            {%- for field in select_fields %}
-                {{ field }}{% if not loop.last %},{% endif %}
-            {%- endfor %}
-            FROM {{ table_name }}
-            WHERE id = ?
-            "#,
-            id
-        )
-        .fetch_optional(&pool)
-        .await?;
-
+    async fn find_by_id(&self, pool: PgPool, id: String) -> Result<Option<{{ struct_name }}>, sqlx::Error> {
+        let item = sqlx::query_as::<_, {{ struct_name }}>(FIND_{{ struct_name | upper }}_INFO_QUERY)
+            .bind(id)
+            .fetch_optional(&pool)
+            .await?;
         Ok(item)
     }
 
     async fn create(
         &self,
-        tx: &mut Transaction<'_, MySql>,
+        tx: &mut Transaction<'_, Postgres>,
         payload: Create{{ struct_name }}Dto,
     ) -> Result<{{ struct_name }}, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
 
         sqlx::query!(
             r#"INSERT INTO {{ table_name }} (
-                id,
-            {%- for field in insert_fields %}
-                {{ field.name }}{% if not loop.last %},{% endif %}
-            {%- endfor %}
-            ) VALUES (
-                ?,
-            {%- for _ in insert_fields %}
-                ?{% if not loop.last %},{% endif %}
-            {%- endfor %}
-            )"#,
+                    id,
+{%- for field in insert_fields %}
+                    {{ field.name }}{% if not loop.last %},{% endif %}
+{%- endfor %}
+                ) VALUES (
+                    $1,
+{%- for field in insert_fields %}
+                    ${{ loop.index + 1 }}{% if not loop.last %},{% endif %}
+{%- endfor %}
+                )"#,
             id,
 {%- for field in insert_fields %}
-{%- if field.name != "id" %}
-            payload.{{ field.name }},{% endif %}
+    {%- if field.is_datetime == "true" %}
+                convert_offset_to_primitive(payload.{{ field.name }}){% if not loop.last %},{% endif %}
+    {%- else %}
+                payload.{{ field.name }}{% if not loop.last %},{% endif %}
+    {%- endif %}
 {%- endfor %}
         )
         .execute(&mut **tx)
         .await?;
 
-        let inserted = sqlx::query_as!(
-            {{ struct_name }},
-            r#"
-            SELECT
-            {%- for field in select_fields %}
-                {{ field }}{% if not loop.last %},{% endif %}
-            {%- endfor %}
-            FROM {{ table_name }}
-            WHERE id = ?
-            "#,
-            id
-        )
-        .fetch_one(&mut **tx)
-        .await?;
+        let created = sqlx::query_as::<_, {{ struct_name }}>(FIND_{{ struct_name | upper }}_INFO_QUERY)
+            .bind(id)
+            .fetch_one(&mut **tx)
+            .await?;
 
-        Ok(inserted)
+        Ok(created)
     }
 
     async fn update(
         &self,
-        tx: &mut Transaction<'_, MySql>,
+        tx: &mut Transaction<'_, Postgres>,
         id: String,
         payload: Update{{ struct_name }}Dto,
     ) -> Result<Option<{{ struct_name }}>, sqlx::Error> {
-        let existing = sqlx::query!(
-            r#"SELECT id FROM {{ table_name }} WHERE id = ?"#,
-            &id
-        )
-        .fetch_optional(&mut **tx)
-        .await?;
+        let existing = sqlx::query_as::<_, {{ struct_name }}>(FIND_{{ struct_name | upper }}_INFO_QUERY)
+            .bind(id.clone())
+            .fetch_optional(&mut **tx)
+            .await?;
 
         if existing.is_some() {
-            let mut builder = sqlx::QueryBuilder::<MySql>::new("UPDATE {{ table_name }} SET ");
-            let mut updates = Vec::new();
+            let mut builder = sqlx::QueryBuilder::<Postgres>::new("UPDATE {{ table_name }} SET ");
+            // always update modified_at
+            builder.push(" modified_at = NOW()");
 
-    {% for field in update_fields %}
-        {% if field.is_optional == "true" %}
+{%- for field in update_fields %}
+    {%- if field.is_optional == "true" %}
             if let Some(value) = payload.{{ field.name }}.clone() {
-            {% if field.is_datetime == "true" %}
-                updates.push(("{{ field.name }}", value.format(&MYSQL_TIMESTAMP_FORMAT).unwrap()));
-            {% else %}
-                updates.push(("{{ field.name }}", value));
-            {% endif %}
+    {%- if field.is_datetime == "true" %}
+                builder.push(", {{ field.name }} = ").push_bind(convert_offset_to_naive(value));
+    {%- else %}
+                builder.push(", {{ field.name }} = ").push_bind(value);
+    {%- endif %}
             }
-        {% else %}
-            {% if field.is_datetime == "true" %}
-                updates.push(("{{ field.name }}", payload.{{ field.name }}.format(&MYSQL_TIMESTAMP_FORMAT).unwrap()));
-            {% else %}
-                updates.push(("{{ field.name }}", payload.{{ field.name }}.clone()));
-            {% endif %}
-        {% endif %}
-    {% endfor %}
+    {%- else %}
+{%- if field.is_datetime == "true" %}
+            builder.push(", {{ field.name }} = ").push_bind(convert_offset_to_naive(payload.{{ field.name }}.clone()));
+{%- else %}
+            builder.push(", {{ field.name }} = ").push_bind(payload.{{ field.name }}.clone());
+{%- endif %}
+    {%- endif %}
+{%- endfor %}
 
-            for (i, (field, value)) in updates.into_iter().enumerate() {
-                if i > 0 {
-                    builder.push(", ");
-                }
-                builder.push(field).push(" = ").push_bind(value);
-            }
+            builder
+                .push(" WHERE id = ")
+                .push_bind(&id);
 
-            builder.push(", modified_at = NOW() WHERE id = ").push_bind(&id);
             let query = builder.build();
             query.execute(&mut **tx).await?;
 
-            let updated = sqlx::query_as!(
-                {{ struct_name }},
-                r#"
-                SELECT
-                {%- for field in select_fields %}
-                    {{ field }}{% if not loop.last %},{% endif %}
-                {%- endfor %}
-                FROM {{ table_name }}
-                WHERE id = ?
-                "#,
-                &id
-            )
-            .fetch_one(&mut **tx)
-            .await?;
+            let updated = sqlx::query_as::<_, {{ struct_name }}>(FIND_{{ struct_name | upper }}_INFO_QUERY)
+                .bind(id)
+                .fetch_one(&mut **tx)
+                .await?;
 
             return Ok(Some(updated));
         }
@@ -160,11 +136,15 @@ impl {{ struct_name }}Repository for {{ struct_name }}Repo {
         Ok(None)
     }
 
-    async fn delete(&self, tx: &mut Transaction<'_, MySql>, id: String) -> Result<bool, sqlx::Error> {
+    async fn delete(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        id: String,
+    ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query!(
             r#"
             DELETE FROM {{ table_name }}
-            WHERE id = ?
+            WHERE id = $1
             "#,
             id
         )

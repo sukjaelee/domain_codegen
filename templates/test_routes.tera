@@ -1,0 +1,147 @@
+
+use axum::http::{Method, StatusCode};
+
+use clean_axum_demo::{
+    common::dto::RestApiResponse,
+    {{ module_name }}::{
+        dto::{Create{{ struct_name }}Dto, {{ struct_name }}Dto, Update{{ struct_name }}Dto},
+    },
+};
+
+use uuid::Uuid;
+mod test_helpers;
+use test_helpers::{
+    deserialize_json_body, request_with_auth, request_with_auth_and_body, TEST_USER_ID,
+};
+
+async fn create_test_{{ module_name }}() -> {{ struct_name }}Dto {
+    let payload = Create{{ struct_name }}Dto {
+{%- for field in create_fields %}
+        {{ field }}: Default::default(),
+{%- endfor %}
+    };
+
+    let response = request_with_auth_and_body(Method::POST, "/{{ module_name }}", &payload);
+    let (parts, body) = response.await.into_parts();
+    assert_eq!(parts.status, StatusCode::OK);
+
+    let response_body: RestApiResponse<{{ struct_name }}Dto> =
+        deserialize_json_body(body).await.unwrap();
+    response_body.0.data.unwrap()
+}
+
+#[tokio::test]
+async fn test_create_{{ module_name }}() {
+    let payload = Create{{ struct_name }}Dto {
+{%- for field in create_fields %}
+        {{ field }}: Default::default(),
+{%- endfor %}
+    };
+
+    let response = request_with_auth_and_body(Method::POST, "/{{ module_name }}", &payload);
+    let (parts, body) = response.await.into_parts();
+    assert_eq!(parts.status, StatusCode::OK);
+
+    let response_body: RestApiResponse<{{ struct_name }}Dto> =
+        deserialize_json_body(body).await.unwrap();
+    assert_eq!(response_body.0.status, StatusCode::OK);
+    let dto = response_body.0.data.unwrap();
+{%- for field in create_fields %}
+    assert_eq!(dto.{{ field }}, payload.{{ field }});
+{%- endfor %}
+}
+
+#[tokio::test]
+async fn test_get_all_{{ module_name }}() {
+    // Ensure at least one entity exists
+    let _ = create_test_{{ module_name }}().await;
+
+    let response = request_with_auth(Method::GET, "/{{ module_name }}");
+    let (parts, body) = response.await.into_parts();
+    assert_eq!(parts.status, StatusCode::OK);
+
+    let response_body: RestApiResponse<Vec<{{ struct_name }}Dto>> =
+        deserialize_json_body(body).await.unwrap();
+    assert_eq!(response_body.0.status, StatusCode::OK);
+    let items = response_body.0.data.unwrap();
+    assert!(!items.is_empty());
+}
+
+#[tokio::test]
+async fn test_get_{{ module_name }}_by_id() {
+    let entity = create_test_{{ module_name }}().await;
+    let id = entity.id.clone();
+    let url = format!("/{{ module_name }}/{}", id);
+    let response = request_with_auth(Method::GET, url.as_str());
+    let (parts, body) = response.await.into_parts();
+    assert_eq!(parts.status, StatusCode::OK);
+
+    let response_body: RestApiResponse<{{ struct_name }}Dto> =
+        deserialize_json_body(body).await.unwrap();
+    assert_eq!(response_body.0.status, StatusCode::OK);
+    let dto = response_body.0.data.unwrap();
+    assert_eq!(dto.id, id);
+}
+
+#[tokio::test]
+async fn test_update_{{ module_name }}() {
+    let entity = create_test_{{ module_name }}().await;
+    let id = entity.id.clone();
+    let payload = Update{{ struct_name }}Dto {
+{%- for field in update_fields %}
+{%- if field == "id" or field == "created_at" %}
+{%- else %}
+{%- if field == "modified_by" %}
+        {{ field }}: entity.{{ field }}.clone(),
+{%- else %}
+        {{ field }}: Some(Default::default()),
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+    };
+    let url = format!("/{{ module_name }}/{}", id);
+    let response = request_with_auth_and_body(Method::PUT, url.as_str(), &payload);
+    let (parts, body) = response.await.into_parts();
+    assert_eq!(parts.status, StatusCode::OK);
+
+    let response_body: RestApiResponse<{{ struct_name }}Dto> =
+        deserialize_json_body(body).await.unwrap();
+    assert_eq!(response_body.0.status, StatusCode::OK);
+    let dto = response_body.0.data.unwrap();
+    assert_eq!(dto.id, id);
+{%- for field in update_fields %}
+{%- if field == "id" or field == "created_at" %}
+{%- else %}
+{%- if field == "modified_by" %}
+    assert_eq!(dto.{{ field }}, payload.{{ field }});
+{%- else %}
+    assert_eq!(dto.{{ field }}, payload.{{ field }}.unwrap());
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+}
+
+#[tokio::test]
+async fn test_delete_{{ module_name }}_not_found() {
+    let non_existent_id = Uuid::new_v4().to_string();
+    let url = format!("/{{ module_name }}/{}", non_existent_id);
+    let response = request_with_auth(Method::DELETE, url.as_str());
+    let (parts, body) = response.await.into_parts();
+    assert_eq!(parts.status, StatusCode::NOT_FOUND);
+
+    let response_body: RestApiResponse<()> = deserialize_json_body(body).await.unwrap();
+    assert_eq!(response_body.0.status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_delete_{{ module_name }}() {
+    let entity = create_test_{{ module_name }}().await;
+    let id = entity.id.clone();
+    let url = format!("/{{ module_name }}/{}", id);
+    let response = request_with_auth(Method::DELETE, url.as_str());
+    let (parts, body) = response.await.into_parts();
+    assert_eq!(parts.status, StatusCode::OK);
+
+    let response_body: RestApiResponse<()> = deserialize_json_body(body).await.unwrap();
+    assert_eq!(response_body.0.status, StatusCode::OK);
+}

@@ -1,6 +1,9 @@
 // Domain model definition for {{ table_name }} entities.
 // Represents core {{ table_name }} attributes and metadata in the system.
 
+{%- if use_chrono %}
+use chrono::NaiveDateTime;
+{%- endif %}
 use sqlx::FromRow;
 
 /// Domain model representing a {{ table_name }} in the application.

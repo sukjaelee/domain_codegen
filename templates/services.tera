@@ -7,18 +7,18 @@ use super::{
 };
 
 use async_trait::async_trait;
-use sqlx::MySqlPool;
+use sqlx::PgPool;
 use std::sync::Arc;
 
 /// Service struct for handling {{ module_name }}-related operations.
 #[derive(Clone)]
 pub struct {{ struct_name }}Service {
-    pool: MySqlPool,
+    pool: PgPool,
     repo: Arc<dyn {{ struct_name }}Repository + Send + Sync>,
 }
 
 impl {{ struct_name }}Service {
-    pub fn create_service(pool: MySqlPool) -> Arc<dyn {{ struct_name }}ServiceTrait> {
+    pub fn create_service(pool: PgPool) -> Arc<dyn {{ struct_name }}ServiceTrait> {
         Arc::new(Self {
             pool,
             repo: Arc::new({{ struct_name }}Repo {}),

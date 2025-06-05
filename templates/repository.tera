@@ -5,33 +5,33 @@ use super::model::{{ struct_name }};
 use crate::{{ module_name }}::dto::{ Create{{ struct_name }}Dto, Update{{ struct_name }}Dto };
 
 use async_trait::async_trait;
-use sqlx::{MySql, Pool, Transaction};
+use sqlx::{PgPool, Postgres, Transaction};
 
 #[async_trait]
 /// Trait representing repository-level operations for {{ table_name }} entities.
 /// Provides an interface for data persistence and retrieval of {{ table_name }} records.
 pub trait {{ struct_name }}Repository: Send + Sync {
     /// Retrieves all {{ table_name }} from the database.
-    async fn find_all(&self, pool: Pool<MySql>) -> Result<Vec<{{ struct_name }}>, sqlx::Error>;
+    async fn find_all(&self, pool: PgPool) -> Result<Vec<{{ struct_name }}>, sqlx::Error>;
 
     /// Finds a {{ table_name }} by its unique identifier.
     async fn find_by_id(
         &self,
-        pool: Pool<MySql>,
+        pool: PgPool,
         id: String,
     ) -> Result<Option<{{ struct_name }}>, sqlx::Error>;
 
     /// Creates a new {{ table_name }} record in the database within the given transaction.
     async fn create(
         &self,
-        tx: &mut Transaction<'_, MySql>,
+        tx: &mut Transaction<'_, Postgres>,
         dto: Create{{ struct_name }}Dto,
     ) -> Result<{{ struct_name }}, sqlx::Error>;
 
     /// Updates an existing {{ table_name }} record with new data.
     async fn update(
         &self,
-        tx: &mut Transaction<'_, MySql>,
+        tx: &mut Transaction<'_, Postgres>,
         id: String,
         dto: Update{{ struct_name }}Dto,
     ) -> Result<Option<{{ struct_name }}>, sqlx::Error>;
@@ -39,7 +39,7 @@ pub trait {{ struct_name }}Repository: Send + Sync {
     /// Deletes a {{ table_name }} record by its ID.
     async fn delete(
         &self,
-        tx: &mut Transaction<'_, MySql>,
+        tx: &mut Transaction<'_, Postgres>,
         id: String,
     ) -> Result<bool, sqlx::Error>;
 }

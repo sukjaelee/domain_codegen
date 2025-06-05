@@ -1,4 +1,4 @@
-use sqlparser::dialect::MySqlDialect;
+use sqlparser::dialect::PostgreSqlDialect;
 use sqlparser::parser::Parser;
 use std::fs;
 
@@ -25,7 +25,7 @@ pub fn parse_sql_file(
     rules: Option<&serde_json::Value>,
 ) -> Result<TableSchema, Box<dyn std::error::Error>> {
     let sql = fs::read_to_string(path)?;
-    let dialect = MySqlDialect {};
+    let dialect = PostgreSqlDialect {};
     let statements = Parser::parse_sql(&dialect, &sql)?;
 
     for stmt in statements {
