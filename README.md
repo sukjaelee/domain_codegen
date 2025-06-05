@@ -1,11 +1,12 @@
 # domain_codegen
 
 This project provides a code generator specifically designed for the [clean_axum_demo](https://github.com/sukjaelee/clean_axum_demo) project.
-It automatically generates the domain layer structure under `gen/src/`, which you can copy and customize as needed.
+It automatically generates the domain layer structure under `gen`, which you can copy and customize as needed.
 
 ```plaintext
+/gen
 ├── src
-│   ├── <domain>/ # Replace with: auth, user, device, file, etc.
+│ │ ├── <domain>/ # Replace with: auth, user, device, file, etc.
 │ │ ├── mod.rs # Module entry point
 │ │ ├── domain/ # Domain logic: models, traits
 │ │ │ ├── mod.rs
@@ -17,6 +18,8 @@ It automatically generates the domain layer structure under `gen/src/`, which yo
 │ │ ├── queries.rs # SQLx query logic
 │ │ ├── dto.rs # Data Transfer Objects
 │ │ └── service.rs # Infrastructure-layer service implementations
+├── tests/
+│   ├── test_<domain>_routes.rs # Integration and API tests
 ```
 
 > When adding a new domain module, be sure to register it in the following files:
