@@ -1,7 +1,7 @@
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::common::ts_format::{convert_offset_to_naive, convert_offset_to_primitive};
+use crate::common::date_util::convert_offset_to_naive;
 use crate::{{ module_name }}::domain::model::{{ struct_name }};
 use crate::{{ module_name }}::domain::repository::{{ struct_name }}Repository;
 use crate::{{ module_name }}::dto::{Create{{ struct_name }}Dto, Update{{ struct_name }}Dto};
@@ -67,7 +67,7 @@ impl {{ struct_name }}Repository for {{ struct_name }}Repo {
             id,
 {%- for field in insert_fields %}
     {%- if field.is_datetime == "true" %}
-                convert_offset_to_primitive(payload.{{ field.name }}){% if not loop.last %},{% endif %}
+                convert_offset_to_naive(payload.{{ field.name }}){% if not loop.last %},{% endif %}
     {%- else %}
                 payload.{{ field.name }}{% if not loop.last %},{% endif %}
     {%- endif %}
