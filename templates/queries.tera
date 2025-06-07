@@ -1,7 +1,6 @@
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::common::date_util::convert_offset_to_naive;
 use crate::{{ module_name }}::domain::model::{{ struct_name }};
 use crate::{{ module_name }}::domain::repository::{{ struct_name }}Repository;
 use crate::{{ module_name }}::dto::{Create{{ struct_name }}Dto, Update{{ struct_name }}Dto};
@@ -66,11 +65,7 @@ impl {{ struct_name }}Repository for {{ struct_name }}Repo {
                 )"#,
             id,
 {%- for field in insert_fields %}
-    {%- if field.is_datetime == "true" %}
-                convert_offset_to_naive(payload.{{ field.name }}){% if not loop.last %},{% endif %}
-    {%- else %}
-                payload.{{ field.name }}{% if not loop.last %},{% endif %}
-    {%- endif %}
+            payload.{{ field.name }}{% if not loop.last %},{% endif %}
 {%- endfor %}
         )
         .execute(&mut **tx)
@@ -103,18 +98,10 @@ impl {{ struct_name }}Repository for {{ struct_name }}Repo {
 {%- for field in update_fields %}
     {%- if field.is_optional == "true" %}
             if let Some(value) = payload.{{ field.name }}.clone() {
-    {%- if field.is_datetime == "true" %}
-                builder.push(", {{ field.name }} = ").push_bind(convert_offset_to_naive(value));
-    {%- else %}
                 builder.push(", {{ field.name }} = ").push_bind(value);
-    {%- endif %}
             }
     {%- else %}
-{%- if field.is_datetime == "true" %}
-            builder.push(", {{ field.name }} = ").push_bind(convert_offset_to_naive(payload.{{ field.name }}.clone()));
-{%- else %}
             builder.push(", {{ field.name }} = ").push_bind(payload.{{ field.name }}.clone());
-{%- endif %}
     {%- endif %}
 {%- endfor %}
 

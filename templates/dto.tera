@@ -1,8 +1,7 @@
 
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
+use chrono::{DateTime, Utc};
 use utoipa::ToSchema;
-use crate::common::date_util::convert_naive_to_offset;
 
 use super::domain::model::{{ struct_name }};
 
@@ -24,11 +23,7 @@ impl From<{{ struct_name }}> for {{ struct_name }}Dto {
     fn from(entity: {{ struct_name }}) -> Self {
         Self {
 {%- for field in fields %}
-    {%- if field.is_datetime == "true" %}
-             {{ field.name }}: entity.{{ field.name }}.map(|naive| convert_naive_to_offset(naive)),
-    {%- else %}
-            {{ field.name }}: entity.{{ field.name }},
-    {%- endif %}
+        {{ field.name }}: entity.{{ field.name }},
 {%- endfor %}
         }
     }

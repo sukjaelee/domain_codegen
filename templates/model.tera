@@ -2,7 +2,7 @@
 // Represents core {{ table_name }} attributes and metadata in the system.
 
 {%- if use_chrono %}
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 {%- endif %}
 use sqlx::FromRow;
 

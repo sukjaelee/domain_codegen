@@ -172,7 +172,7 @@ fn map_sql_type(sql_type: &str) -> &'static str {
         "float" => "f32",
         "double" => "f64",
         "date" => "time::Date",
-        "datetime" | "timestamp" => "time::OffsetDateTime", // <-- NO Option here
+        "datetime" | "timestamp" => "DateTime<Utc>", // <-- NO Option here
         "time" => "String",
         "year" => "i16",
         s if s.starts_with("enum") || s.starts_with("set") => "String",
@@ -204,10 +204,10 @@ fn generate_model(
         .iter()
         .map(|col| {
             let mut map = HashMap::new();
-            // Determine Rust type, using NaiveDateTime for timestamps
+            // Determine Rust type, using DateTime<Utc> for timestamps
             let base_type = col.sql_type.to_lowercase();
             let rust_type = if base_type == "timestamp" || base_type == "datetime" {
-                "NaiveDateTime".to_string()
+                "DateTime<Utc>".to_string()
             } else {
                 map_sql_type(&col.sql_type).to_string()
             };
@@ -227,7 +227,7 @@ fn generate_model(
 
     context.insert("fields", &fields);
 
-    // If any field uses NaiveDateTime, ensure the template sees it
+    // If any field uses DateTime<Utc>, ensure the template sees it
     context.insert("use_chrono", &true);
 
     let struct_code = tera.render("model.tera", &context)?;
@@ -268,9 +268,9 @@ pub fn generate_dto(
             let mut map = HashMap::new();
             let sql_lower = col.sql_type.to_lowercase();
 
-            // Map SQL datetime types to OffsetDateTime, others via map_sql_type
+            // Map SQL datetime types to DateTime<Utc>, others via map_sql_type
             let base_type = if sql_lower == "timestamp" || sql_lower == "datetime" {
-                "OffsetDateTime".to_string()
+                "DateTime<Utc>".to_string()
             } else {
                 map_sql_type(&col.sql_type).to_string()
             };
@@ -303,7 +303,7 @@ pub fn generate_dto(
             let mut map = HashMap::new();
             let sql_lower = col.sql_type.to_lowercase();
             let base_type = if sql_lower == "timestamp" || sql_lower == "datetime" {
-                "OffsetDateTime".to_string()
+                "DateTime<Utc>".to_string()
             } else {
                 map_sql_type(&col.sql_type).to_string()
             };
@@ -331,7 +331,7 @@ pub fn generate_dto(
             let mut map = HashMap::new();
             let sql_lower = col.sql_type.to_lowercase();
             let base_type = if sql_lower == "timestamp" || sql_lower == "datetime" {
-                "OffsetDateTime".to_string()
+                "DateTime<Utc>".to_string()
             } else {
                 map_sql_type(&col.sql_type).to_string()
             };
@@ -535,14 +535,14 @@ fn generate_queries(
             let ty = if col.name == "modified_by" {
                 // Use base type; Tera will detect datetime if needed
                 if is_dt == "true" {
-                    "OffsetDateTime".to_string()
+                    "DateTime<Utc>".to_string()
                 } else {
                     map_sql_type(&col.sql_type).to_string()
                 }
             } else {
                 // Option<...>
                 if is_dt == "true" {
-                    format!("Option<OffsetDateTime>")
+                    format!("Option<DateTime<Utc>>")
                 } else {
                     format!("Option<{}>", map_sql_type(&col.sql_type))
                 }
