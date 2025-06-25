@@ -1,12 +1,12 @@
-use crate::common::dto::RestApiResponse;
-use crate::common::{app_state::AppState, error::AppError, jwt::Claims};
-
-use crate::{{ module_name }}::dto::{Create{{ struct_name }}Dto, {{ struct_name }}Dto, Update{{ struct_name }}Dto};
 use axum::{
     extract::{Path, State},
     response::IntoResponse,
     Extension, Json,
 };
+
+use crate::common::dto::RestApiResponse;
+use crate::common::{app_state::AppState, error::AppError, jwt::Claims};
+use crate::domains::{{ module_name }}::dto::{{ module_name }}_dto::{Create{{ struct_name }}Dto, {{ struct_name }}Dto, Update{{ struct_name }}Dto};
 
 #[utoipa::path(
     get,

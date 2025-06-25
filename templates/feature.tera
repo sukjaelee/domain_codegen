@@ -1,0 +1,24 @@
+mod api {
+    mod handlers;
+    pub mod routes;
+}
+
+mod domain {
+    pub mod model;
+    pub mod repository;
+    pub mod service;
+}
+
+pub mod dto {
+    pub mod {{ module_name }}_dto;
+}
+
+mod infra {
+    mod impl_repository;
+    pub mod impl_service;
+}
+
+// Re-export commonly used items for convenience
+pub use api::routes::{{ module_name }}_routes, {{ struct_name }}ApiDoc};
+pub use domain::service::{{ struct_name }}ServiceTrait;
+pub use infra::impl_service::{{ struct_name }}Service;

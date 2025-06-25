@@ -2,7 +2,7 @@
 // the database operations related to {{ table_name }} management.
 
 use super::model::{{ struct_name }};
-use crate::{{ module_name }}::dto::{ Create{{ struct_name }}Dto, Update{{ struct_name }}Dto };
+use crate::domains::{{ module_name }}::dto::{{ module_name }}_dto::{ Create{{ struct_name }}Dto, Update{{ struct_name }}Dto };
 
 use async_trait::async_trait;
 use sqlx::{PgPool, Postgres, Transaction};

@@ -11,40 +11,29 @@ pub fn generate_code(
     for table in schema {
         // domain
         generate_model(table, output_dir)?;
-        generate_dto(table, output_dir)?;
         generate_repository(table, output_dir)?;
         generate_service(table, output_dir)?;
 
-        // Create mod.rs for domain
-        let base = Path::new(output_dir).join(&table.module_name);
-        fs::create_dir_all(base.join("domain"))?;
+        // dto, routes, handlers, services, queries, tests
+        generate_dto(table, output_dir)?;
 
-        fs::write(
-            base.join("domain/mod.rs"),
-            "pub mod model;\npub mod repository;\npub mod service;\n",
-        )?;
-
-        // domain's super
+        // api
         generate_routes(table, output_dir)?;
         generate_handlers(table, output_dir)?;
-        generate_services(table, output_dir)?;
-        generate_queries(table, output_dir)?;
-        generate_tests(table, output_dir)?;
 
-        fs::write(
-            base.join("mod.rs"),
-            "pub mod domain;\n\
-             pub mod dto;\n\
-             pub mod handlers;\n\
-             pub mod queries;\n\
-             pub mod routes;\n\
-             pub mod services;\n",
-        )?;
+        // infra
+        generate_impl_service(table, output_dir)?;
+        generate_impl_repository(table, output_dir)?;
+
+        // tests
+        generate_tests(table, output_dir)?;
     }
 
     // common
-    // After all domains are generated, generate src/lib.rs
-    generate_lib(schema, output_dir)?;
+    // After all domains are generated, generate src/domains.rs
+    generate_domains(schema, output_dir)?;
+    // feature
+    generate_feature(schema, output_dir)?;
     generate_app(schema, output_dir)?;
     generate_app_state(schema, output_dir)?;
     generate_bootstrap(schema, output_dir)?;
@@ -121,8 +110,8 @@ pub fn generate_app(
     Ok(())
 }
 
-/// Generates the `lib.rs` file exposing modules.
-pub fn generate_lib(
+/// Generates the `domains.rs` file exposing modules.
+pub fn generate_domains(
     schemas: &[TableSchema],
     output_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -135,8 +124,29 @@ pub fn generate_lib(
         .collect::<Vec<_>>();
     context.insert("modules", &modules);
 
-    let lib_code = tera.render("lib.tera", &context)?;
-    fs::write(Path::new(output_dir).join("lib.rs"), lib_code)?;
+    let domains_code = tera.render("domains.tera", &context)?;
+    fs::write(Path::new(output_dir).join("domains.rs"), domains_code)?;
+
+    Ok(())
+}
+
+pub fn generate_feature(
+    schemas: &[TableSchema],
+    output_dir: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let tera = Tera::new("templates/**/*")?;
+
+    let mut context = Context::new();
+
+    let schema = &schemas[0]; // Assuming we only generate one feature per module
+    // Insert basic context values
+    context.insert("struct_name", &schema.struct_name);
+    context.insert("module_name", &schema.module_name);
+
+    let feature_code = tera.render("feature.tera", &context)?;
+
+    let feature_file_name = format!("{}.rs", schema.module_name.to_lowercase());
+    fs::write(Path::new(output_dir).join(feature_file_name), feature_code)?;
 
     Ok(())
 }
@@ -172,7 +182,7 @@ fn map_sql_type(sql_type: &str) -> &'static str {
         "float" => "f32",
         "double" => "f64",
         "date" => "time::Date",
-        "datetime" | "timestamp" => "DateTime<Utc>", // <-- NO Option here
+        "datetime" | "timestamp" | "timestamptz" => "DateTime<Utc>", // <-- NO Option here
         "time" => "String",
         "year" => "i16",
         s if s.starts_with("enum") || s.starts_with("set") => "String",
@@ -189,6 +199,7 @@ fn generate_model(
     output_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let domain_dir = Path::new(output_dir)
+        .join("domains")
         .join(&schema.module_name)
         .join("domain");
     fs::create_dir_all(&domain_dir)?;
@@ -206,7 +217,10 @@ fn generate_model(
             let mut map = HashMap::new();
             // Determine Rust type, using DateTime<Utc> for timestamps
             let base_type = col.sql_type.to_lowercase();
-            let rust_type = if base_type == "timestamp" || base_type == "datetime" {
+            let rust_type = if base_type == "timestamp"
+                || base_type == "timestamptz"
+                || base_type == "datetime"
+            {
                 "DateTime<Utc>".to_string()
             } else {
                 map_sql_type(&col.sql_type).to_string()
@@ -230,11 +244,9 @@ fn generate_model(
     // If any field uses DateTime<Utc>, ensure the template sees it
     context.insert("use_chrono", &true);
 
-    let struct_code = tera.render("model.tera", &context)?;
+    let model_code = tera.render("model.tera", &context)?;
 
-    let model_path = domain_dir.join("model.rs");
-    fs::write(model_path, struct_code)?;
-
+    fs::write(domain_dir.join("model.rs"), model_code)?;
     Ok(())
 }
 
@@ -243,17 +255,22 @@ pub fn generate_dto(
     schema: &TableSchema,
     output_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let struct_name = &schema.struct_name;
+
     // Determine the path where the DTO file will be written
     let dto_path = Path::new(output_dir)
+        .join("domains")
         .join(&schema.module_name)
-        .join("dto.rs");
+        .join("dto");
+
+    fs::create_dir_all(&dto_path)?;
 
     let tera = Tera::new("templates/**/*")?;
     let mut context = Context::new();
 
-    // Insert the struct name into context
-    let struct_name = &schema.struct_name;
+    // Insert the struct_name, module_name into context
     context.insert("struct_name", struct_name);
+    context.insert("module_name", &schema.module_name);
 
     // Retrieve rule-based field lists or fallback to empty vectors
     let create_skip = schema.create_special_fields.as_deref().unwrap_or(&[]);
@@ -269,7 +286,10 @@ pub fn generate_dto(
             let sql_lower = col.sql_type.to_lowercase();
 
             // Map SQL datetime types to DateTime<Utc>, others via map_sql_type
-            let base_type = if sql_lower == "timestamp" || sql_lower == "datetime" {
+            let base_type = if sql_lower == "timestamp"
+                || sql_lower == "timestamptz"
+                || sql_lower == "datetime"
+            {
                 "DateTime<Utc>".to_string()
             } else {
                 map_sql_type(&col.sql_type).to_string()
@@ -285,7 +305,9 @@ pub fn generate_dto(
             map.insert("name", col.name.clone());
             map.insert("ty", ty);
             // Flag indicating whether this is a datetime column
-            let is_dt = (sql_lower == "timestamp" || sql_lower == "datetime").to_string();
+            let is_dt =
+                (sql_lower == "timestamp" || sql_lower == "timestamptz" || sql_lower == "datetime")
+                    .to_string();
             map.insert("is_datetime", is_dt);
             // Flag indicating whether this field is optional
             map.insert("is_optional", col.is_nullable.to_string());
@@ -302,7 +324,10 @@ pub fn generate_dto(
         .map(|col| {
             let mut map = HashMap::new();
             let sql_lower = col.sql_type.to_lowercase();
-            let base_type = if sql_lower == "timestamp" || sql_lower == "datetime" {
+            let base_type = if sql_lower == "timestamp"
+                || sql_lower == "timestamptz"
+                || sql_lower == "datetime"
+            {
                 "DateTime<Utc>".to_string()
             } else {
                 map_sql_type(&col.sql_type).to_string()
@@ -314,7 +339,9 @@ pub fn generate_dto(
             };
             map.insert("name", col.name.clone());
             map.insert("ty", ty);
-            let is_dt = (sql_lower == "timestamp" || sql_lower == "datetime").to_string();
+            let is_dt =
+                (sql_lower == "timestamp" || sql_lower == "timestamptz" || sql_lower == "datetime")
+                    .to_string();
             map.insert("is_datetime", is_dt);
             map.insert("is_optional", col.is_nullable.to_string());
             map
@@ -330,7 +357,10 @@ pub fn generate_dto(
         .map(|col| {
             let mut map = HashMap::new();
             let sql_lower = col.sql_type.to_lowercase();
-            let base_type = if sql_lower == "timestamp" || sql_lower == "datetime" {
+            let base_type = if sql_lower == "timestamp"
+                || sql_lower == "timestamptz"
+                || sql_lower == "datetime"
+            {
                 "DateTime<Utc>".to_string()
             } else {
                 map_sql_type(&col.sql_type).to_string()
@@ -343,7 +373,9 @@ pub fn generate_dto(
             };
             map.insert("name", col.name.clone());
             map.insert("ty", ty);
-            let is_dt = (sql_lower == "timestamp" || sql_lower == "datetime").to_string();
+            let is_dt =
+                (sql_lower == "timestamp" || sql_lower == "timestamptz" || sql_lower == "datetime")
+                    .to_string();
             map.insert("is_datetime", is_dt);
             let is_opt = (!always_include.contains(&col.name)).to_string();
             map.insert("is_optional", is_opt);
@@ -354,7 +386,9 @@ pub fn generate_dto(
 
     // Render the template and write to file
     let dto_code = tera.render("dto.tera", &context)?;
-    fs::write(dto_path, dto_code)?;
+    let dto_file_name = format!("{}_dto.rs", struct_name.to_lowercase());
+
+    fs::write(dto_path.join(dto_file_name), dto_code)?;
 
     Ok(())
 }
@@ -365,6 +399,7 @@ fn generate_repository(
     output_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let domain_dir = Path::new(output_dir)
+        .join("domains")
         .join(&schema.module_name)
         .join("domain");
     fs::create_dir_all(&domain_dir)?;
@@ -377,9 +412,7 @@ fn generate_repository(
     context.insert("module_name", &schema.module_name);
 
     let repository_code = tera.render("repository.tera", &context)?;
-
-    let repository_path = domain_dir.join("repository.rs");
-    fs::write(repository_path, repository_code)?;
+    fs::write(domain_dir.join("repository.rs"), repository_code)?;
 
     Ok(())
 }
@@ -390,6 +423,7 @@ fn generate_service(
     output_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let domain_dir = Path::new(output_dir)
+        .join("domains")
         .join(&schema.module_name)
         .join("domain");
     fs::create_dir_all(&domain_dir)?;
@@ -402,9 +436,7 @@ fn generate_service(
     context.insert("module_name", &schema.module_name);
 
     let service_code = tera.render("service.tera", &context)?;
-
-    let service_path = domain_dir.join("service.rs");
-    fs::write(service_path, service_code)?;
+    fs::write(domain_dir.join("service.rs"), service_code)?;
 
     Ok(())
 }
@@ -414,7 +446,11 @@ fn generate_routes(
     schema: &TableSchema,
     output_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let base_dir = Path::new(output_dir).join(&schema.module_name);
+    let base_dir = Path::new(output_dir)
+        .join("domains")
+        .join(&schema.module_name)
+        .join("api");
+
     fs::create_dir_all(&base_dir)?;
 
     let tera = Tera::new("templates/**/*")?;
@@ -424,9 +460,7 @@ fn generate_routes(
     context.insert("module_name", &schema.module_name);
 
     let routes_code = tera.render("routes.tera", &context)?;
-
-    let routes_path = base_dir.join("routes.rs");
-    fs::write(routes_path, routes_code)?;
+    fs::write(base_dir.join("routes.rs"), routes_code)?;
 
     Ok(())
 }
@@ -436,7 +470,11 @@ fn generate_handlers(
     schema: &TableSchema,
     output_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let base_dir = Path::new(output_dir).join(&schema.module_name);
+    let base_dir = Path::new(output_dir)
+        .join("domains")
+        .join(&schema.module_name)
+        .join("api");
+
     fs::create_dir_all(&base_dir)?;
 
     let tera = Tera::new("templates/**/*")?;
@@ -446,19 +484,21 @@ fn generate_handlers(
     context.insert("module_name", &schema.module_name);
 
     let handlers_code = tera.render("handlers.tera", &context)?;
-
-    let handlers_path = base_dir.join("handlers.rs");
-    fs::write(handlers_path, handlers_code)?;
+    fs::write(base_dir.join("handlers.rs"), handlers_code)?;
 
     Ok(())
 }
 
 /// Generates the `services.rs` file for the table schema.
-fn generate_services(
+fn generate_impl_service(
     schema: &TableSchema,
     output_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let base_dir = Path::new(output_dir).join(&schema.module_name);
+    let base_dir = Path::new(output_dir)
+        .join("domains")
+        .join(&schema.module_name)
+        .join("infra");
+
     fs::create_dir_all(&base_dir)?;
 
     let tera = Tera::new("templates/**/*")?;
@@ -467,20 +507,22 @@ fn generate_services(
     context.insert("struct_name", &schema.struct_name);
     context.insert("module_name", &schema.module_name);
 
-    let services_code = tera.render("services.tera", &context)?;
+    let impl_service_code = tera.render("impl_service.tera", &context)?;
 
-    let services_path = base_dir.join("services.rs");
-    fs::write(services_path, services_code)?;
+    fs::write(base_dir.join("impl_service.rs"), impl_service_code)?;
 
     Ok(())
 }
 
 /// Generates the `queries.rs` file for the table schema.
-fn generate_queries(
+fn generate_impl_repository(
     schema: &TableSchema,
     output_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let base_dir = Path::new(output_dir).join(&schema.module_name);
+    let base_dir = Path::new(output_dir)
+        .join("domains")
+        .join(&schema.module_name)
+        .join("infra");
     fs::create_dir_all(&base_dir)?;
 
     let tera = Tera::new("templates/**/*")?;
@@ -512,6 +554,7 @@ fn generate_queries(
             map.insert("name", col.name.clone());
             // Flag indicating datetime columns for create binding
             let is_dt = (col.sql_type.to_lowercase() == "timestamp"
+                || col.sql_type.to_lowercase() == "timestamptz"
                 || col.sql_type.to_lowercase() == "datetime")
                 .to_string();
             map.insert("is_datetime", is_dt);
@@ -528,6 +571,7 @@ fn generate_queries(
         .map(|col| {
             let mut map = HashMap::new();
             let is_dt = (col.sql_type.to_lowercase() == "timestamp"
+                || col.sql_type.to_lowercase() == "timestamptz"
                 || col.sql_type.to_lowercase() == "datetime")
                 .to_string();
             // For update, columns in update_special_fields are skipped entirely
@@ -557,8 +601,8 @@ fn generate_queries(
     context.insert("update_fields", &update_fields);
 
     // Render and write file
-    let queries_code = tera.render("queries.tera", &context)?;
-    fs::write(base_dir.join("queries.rs"), queries_code)?;
+    let impl_repository_code = tera.render("impl_repository.tera", &context)?;
+    fs::write(base_dir.join("impl_repository.rs"), impl_repository_code)?;
     Ok(())
 }
 

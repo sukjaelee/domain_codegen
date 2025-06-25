@@ -4,7 +4,7 @@ CREATE TABLE todos (
     title VARCHAR(255) NOT NULL,
     description TEXT,
     status VARCHAR(32) NOT NULL DEFAULT 'pending',
-    due_date TIMESTAMP NULL,
+    due_date TIMESTAMPTZ NULL,
     created_by VARCHAR(36) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified_by VARCHAR(36) NOT NULL,

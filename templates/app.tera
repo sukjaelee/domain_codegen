@@ -1,12 +1,8 @@
-use crate::{
+use crate::domains::{
 {%- for module in modules %}
-    {{ module }}::routes::{{ module }}_routes,
-{%- endfor %}
-};
-
-use crate::{
-{%- for module in modules %}
-    {{ module }}::routes::{{ module | capitalize }}ApiDoc,
+    {{ module }}::{
+        {{ module }}_routes, {{ module | capitalize }}ApiDoc,
+    },
 {%- endfor %}
 };
 

@@ -5,13 +5,15 @@ use crate::common::config::Config;
 use crate::common::app_state::AppState;
 
 {%- for module in modules %}
-use crate::{{ module.module }}::services::{{ module.struct_name }}Service;
+use crate::domains::{{ module.module }}::{
+    {{ module.struct_name }}Service, {{ module.struct_name }}ServiceTrait
+};
 {%- endfor %}
 
 /// Constructs and wires all application services and returns a configured AppState.
 pub fn build_app_state(pool: PgPool, config: Config) -> AppState {
 {%- for module in modules %}
-    let {{ module.module }}_service = {{ module.struct_name }}Service::create_service(pool.clone());
+    let {{ module.module }}_service: Arc<dyn {{ module.struct_name }}ServiceTrait> = {{ module.struct_name }}Service::create_service(pool.clone());
 {%- endfor %}
 
     AppState::new(

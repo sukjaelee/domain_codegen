@@ -3,8 +3,8 @@ use axum::http::{Method, StatusCode};
 
 use clean_axum_demo::{
     common::dto::RestApiResponse,
-    todo::{
-        dto::{CreateTodoDto, TodoDto, UpdateTodoDto},
+    domains::todo::{
+        dto::todo_dto::{CreateTodoDto, TodoDto, UpdateTodoDto},
     },
 };
 

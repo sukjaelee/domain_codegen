@@ -1,9 +1,11 @@
-use crate::common::error::AppError;
-
-use super::{
-    domain::{repository::{{ struct_name }}Repository, service::{{ struct_name }}ServiceTrait},
-    dto::{Create{{ struct_name }}Dto, {{ struct_name }}Dto, Update{{ struct_name }}Dto},
-    queries::{{ struct_name }}Repo,
+use crate::{
+    common::error::AppError,
+    domains::{{ module_name }}::{
+        domain::repository::{{ struct_name }}Repository,
+        dto::{{ module_name }}_dto::{Create{{ struct_name }}Dto, {{ struct_name }}Dto, Update{{ struct_name }}Dto},
+        infra::impl_repository::{{ struct_name }}Repo,
+        {{ struct_name }}ServiceTrait,
+    },
 };
 
 use async_trait::async_trait;
@@ -17,17 +19,16 @@ pub struct {{ struct_name }}Service {
     repo: Arc<dyn {{ struct_name }}Repository + Send + Sync>,
 }
 
-impl {{ struct_name }}Service {
-    pub fn create_service(pool: PgPool) -> Arc<dyn {{ struct_name }}ServiceTrait> {
+#[async_trait]
+impl {{ struct_name }}ServiceTrait for {{ struct_name }}Service {
+    /// constructor for the service.
+    fn create_service(pool: PgPool) -> Arc<dyn {{ struct_name }}ServiceTrait> {
         Arc::new(Self {
             pool,
             repo: Arc::new({{ struct_name }}Repo {}),
         })
     }
-}
 
-#[async_trait]
-impl {{ struct_name }}ServiceTrait for {{ struct_name }}Service {
     async fn get_{{ module_name }}s(&self) -> Result<Vec<{{ struct_name }}Dto>, AppError> {
         match self.repo.find_all(self.pool.clone()).await {
             Ok(items) => Ok(items.into_iter().map(Into::into).collect()),

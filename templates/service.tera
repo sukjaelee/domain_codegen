@@ -1,15 +1,23 @@
 //! This module defines the `{{ struct_name }}ServiceTrait` which encapsulates the business logic
 //! for managing {{ module_name }} in the system.
 
+use std::sync::Arc;
+use sqlx::PgPool;
+
 use crate::{
     common::error::AppError,
-    {{ module_name }}::dto::{ Create{{ struct_name }}Dto, {{ struct_name }}Dto, Update{{ struct_name }}Dto },
+    domains::{{ module_name }}::dto::{{ module_name }}_dto::{ Create{{ struct_name }}Dto, {{ struct_name }}Dto, Update{{ struct_name }}Dto },
 };
 
 #[async_trait::async_trait]
 /// Trait defining the contract for {{ module_name }}-related business operations.
 /// This includes creating, retrieving, updating, and deleting {{ module_name }} records.
 pub trait {{ struct_name }}ServiceTrait: Send + Sync {
+    /// constructor for the service.
+    fn create_service(pool: PgPool) -> Arc<dyn {{ struct_name }}ServiceTrait>
+    where
+        Self: Sized;
+
     /// Retrieves a list of all {{ module_name }}.
     async fn get_{{ module_name }}s(&self) -> Result<Vec<{{ struct_name }}Dto>, AppError>;
 
