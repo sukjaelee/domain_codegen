@@ -1,25 +1,33 @@
 # domain_codegen
 
 This project provides a code generator specifically designed for the [clean_axum_demo](https://github.com/sukjaelee/clean_axum_demo) project.
-It automatically generates the domain layer structure under `gen`, which you can copy and customize as needed.
+It automatically generates the domain's feature layer structure under `gen`, which you can copy and customize as needed.
 
 ```plaintext
 /gen
 ├── src
-│ │ ├── <domain>/ # Replace with: auth, user, device, file, etc.
-│ │ ├── mod.rs # Module entry point
-│ │ ├── domain/ # Domain logic: models, traits
-│ │ │ ├── mod.rs
-│ │ │ ├── model.rs
-│ │ │ ├── repository.rs
-│ │ │ └── service.rs
-│ │ ├── handlers.rs # HTTP handlers
-│ │ ├── routes.rs # Route definitions
-│ │ ├── queries.rs # SQLx query logic
-│ │ ├── dto.rs # Data Transfer Objects
-│ │ └── service.rs # Infrastructure-layer service implementations
-├── tests/
-│   ├── test_<domain>_routes.rs # Integration and API tests
+│   ├── app.rs
+│   ├── common
+│   │   ├── app_state.rs
+│   │   └── bootstrap.rs
+│   ├── domains
+│   │   └── <feature>
+│   │       ├── api
+│   │       │   ├── handlers.rs
+│   │       │   └── routes.rs
+│   │       ├── domain
+│   │       │   ├── model.rs
+│   │       │   ├── repository.rs
+│   │       │   └── service.rs
+│   │       ├── dto
+│   │       │   └── <feature>_dto.rs
+│   │       └── infra
+│   │           ├── impl_repository.rs
+│   │           └── impl_service.rs
+│   ├── domains.rs
+│   └── <feature>.rs
+└── tests
+    └── test_<feature>_routes.rs
 ```
 
 > When adding a new domain module, be sure to register it in the following files:
