@@ -1,11 +1,12 @@
 
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use simple_dto_mapper_derive::DtoFrom;
 use utoipa::ToSchema;
 
 use crate::domains::{{ module_name }}::domain::model::{{ struct_name }};
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, DtoFrom)]
 pub struct {{ struct_name }}Dto {
 {%- for field in fields %}
     {%- if field.is_datetime == "true" %}
@@ -19,15 +20,6 @@ pub struct {{ struct_name }}Dto {
 {%- endfor %}
 }
 
-impl From<{{ struct_name }}> for {{ struct_name }}Dto {
-    fn from(entity: {{ struct_name }}) -> Self {
-        Self {
-{%- for field in fields %}
-        {{ field.name }}: entity.{{ field.name }},
-{%- endfor %}
-        }
-    }
-}
 
 #[derive(PartialEq, Debug, Deserialize, Serialize, ToSchema)]
 pub struct Create{{ struct_name }}Dto {
